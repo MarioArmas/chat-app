@@ -8,7 +8,7 @@ block content
     p Conectando...
   
   form#messageForm(onsubmit="sendMessage(event)")
-    input#messageInput(type="text", placeholder="Escribe un mensaje...", required)
+    input#messageInput(type="text", autocomplete="off", placeholder="Escribe un mensaje...", required)
     button(type="submit") Enviar
   
   script.
