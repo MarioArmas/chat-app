@@ -7,6 +7,7 @@
 var app = require('../app');
 var debug = require('debug')('chat-app:server');
 var http = require('http');
+const { WebSocketServer } = require('ws');
 
 /**
  * Get port from environment and store in Express.
@@ -20,6 +21,103 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
+
+/**
+ * Create WebSocket server.
+ */
+
+const wss = new WebSocketServer({ server });
+app.set('wss', wss);
+
+// Lista de nombres de animales
+const animalNames = [
+  'León', 'Tigre', 'Elefante', 'Jirafa', 'Mono', 'Panda', 'Koala', 'Oso', 'Lobo', 'Zorro',
+  'Conejo', 'Gato', 'Perro', 'Pájaro', 'Pez', 'Tortuga', 'Serpiente', 'Águila', 'Tiburón', 'Delfín',
+  'Ballena', 'Pingüino', 'Flamenco', 'Canguro', 'Cebra', 'Hipopótamo', 'Rinoceronte', 'Camello', 'Caballo', 'Vaca'
+];
+
+// Lista de colores para distinguir usuarios
+const animalColors = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+  '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2', '#AED6F1', '#A3E4D7', '#F9E79F', '#D2B4DE', '#A9DFBF',
+  '#FAD7A0', '#ABEBC6', '#F5B7B1', '#AED6F1', '#D7BDE2', '#A9CCE3', '#A2D9CE', '#F9E79F', '#D5A6BD', '#A9DFBF'
+];
+
+// Mantener registro de nombres y colores en uso
+const usedNames = new Set();
+const usedColors = new Set();
+
+wss.on('connection', (ws) => {
+  // Función para obtener nombre único
+  const getUniqueName = () => {
+    const availableNames = animalNames.filter(name => !usedNames.has(name));
+    if (availableNames.length === 0) {
+      // Si se agotan los nombres, permitir repeticiones con número
+      const baseName = animalNames[Math.floor(Math.random() * animalNames.length)];
+      let counter = 1;
+      let uniqueName = `${baseName}${counter}`;
+      while (usedNames.has(uniqueName)) {
+        counter++;
+        uniqueName = `${baseName}${counter}`;
+      }
+      return uniqueName;
+    }
+    return availableNames[Math.floor(Math.random() * availableNames.length)];
+  };
+
+  // Función para obtener color único
+  const getUniqueColor = () => {
+    const availableColors = animalColors.filter(color => !usedColors.has(color));
+    if (availableColors.length === 0) {
+      // Si se agotan los colores, permitir repeticiones
+      return animalColors[Math.floor(Math.random() * animalColors.length)];
+    }
+    return availableColors[Math.floor(Math.random() * availableColors.length)];
+  };
+
+  // Asignar nombre y color únicos
+  const animalName = getUniqueName();
+  const animalColor = getUniqueColor();
+  
+  usedNames.add(animalName);
+  usedColors.add(animalColor);
+  
+  ws.animalName = animalName;
+  ws.animalColor = animalColor;
+  
+  console.log(`Client connected: ${animalName} (${animalColor}) - Total users: ${usedNames.size}`);
+
+  ws.on('message', (data) => {
+    const message = data.toString();
+    console.log(`Received from ${animalName}:`, message);
+
+    // Broadcast to all clients with color info
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({
+          type: 'message',
+          animalName: ws.animalName,
+          animalColor: ws.animalColor,
+          message: message
+        }));
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    console.log(`${animalName} disconnected`);
+    // Liberar nombre y color cuando se desconecta
+    usedNames.delete(animalName);
+    usedColors.delete(animalColor);
+  });
+  
+  // Send welcome message with color info
+  ws.send(JSON.stringify({
+    type: 'welcome',
+    animalName: animalName,
+    animalColor: animalColor
+  }));
+});
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -87,4 +185,5 @@ function onListening() {
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
+  console.log('Server running on http://localhost:' + addr.port);
 }

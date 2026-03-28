@@ -3,3 +3,78 @@ extends layout
 block content
   h1= title
   p Welcome to #{title}
+  
+  div#messages
+    p Conectando...
+  
+  form#messageForm(onsubmit="sendMessage(event)")
+    input#messageInput(type="text", placeholder="Escribe un mensaje...", required)
+    button(type="submit") Enviar
+  
+  script.
+    const ws = new WebSocket('ws://' + window.location.host);
+    const messagesDiv = document.getElementById('messages');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    let myAnimalName = '';
+    let myAnimalColor = '';
+    
+    ws.onopen = function() {
+      console.log('Conectado al servidor');
+      messagesDiv.innerHTML = '<p style="color: #27ae60; font-weight: bold;">✓ Conectado</p>';
+    };
+    
+    ws.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'welcome') {
+          myAnimalName = data.animalName;
+          myAnimalColor = data.animalColor;
+          const welcomeMsg = document.createElement('p');
+          welcomeMsg.textContent = `¡Bienvenido! Eres ${myAnimalName}`;
+          welcomeMsg.style.fontWeight = 'bold';
+          welcomeMsg.style.color = myAnimalColor;
+          messagesDiv.appendChild(welcomeMsg);
+          return;
+        }
+        
+        if (data.type === 'message') {
+          const messageElement = document.createElement('p');
+          messageElement.textContent = `${data.animalName}: ${data.message}`;
+          messageElement.style.color = data.animalColor;
+          messageElement.style.margin = '5px 0';
+          messageElement.style.padding = '3px 8px';
+          messageElement.style.borderRadius = '5px';
+          messageElement.style.backgroundColor = data.animalColor + '20'; // Color con 20% opacidad
+          messagesDiv.appendChild(messageElement);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
+        }
+      } catch (e) {
+        // Fallback para mensajes antiguos en formato string
+        const messageElement = document.createElement('p');
+        messageElement.textContent = event.data;
+        messagesDiv.appendChild(messageElement);
+      }
+    };
+    
+    ws.onerror = function(error) {
+      console.error('Error:', error);
+      messagesDiv.innerHTML = '<p style="color: #e74c3c; font-weight: bold;">❌ Error de conexión</p>';
+    };
+    
+    ws.onclose = function() {
+      messagesDiv.innerHTML = '<p style="color: #e74c3c; font-weight: bold;">Desconectado</p>';
+    };
+    
+    function sendMessage(event) {
+      event.preventDefault();
+      const message = messageInput.value.trim();
+      
+      if (message && ws.readyState === 1) {
+        ws.send(message);
+        messageInput.value = '';
+      } else {
+        console.error('WebSocket no conectado o mensaje vacío');
+      }
+    }
