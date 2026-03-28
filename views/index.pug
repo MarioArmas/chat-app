@@ -12,7 +12,7 @@ block content
     button(type="submit") Enviar
   
   script.
-    const ws = new WebSocket('ws://' + window.location.host);
+    const ws = new WebSocket('wss://' + window.location.host);
     const messagesDiv = document.getElementById('messages');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
